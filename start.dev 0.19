@@ -102,11 +102,11 @@ void game(GameTable &Table, vector<PlayerHand> &p, vector<Card> &AllCards, int &
 
 void giveCards(int &PLAYER_NUMBER, vector<PlayerHand> &p, vector<Card> &AllCards) {   //Функция раздачи карт
     for (int i=0; i<PLAYER_NUMBER; i++) {
-        if ( p[i].pCards.size() < 6) {
+        if ( p[i].pCards.size() < 6 && AllCards.size() > 0) {
             do {
             p[i].pCards.insert(p[i].pCards.end(), AllCards[0]);
             AllCards.erase(AllCards.begin());
-            } while (p[i].pCards.size() < 6);
+            } while (p[i].pCards.size() < 6 || AllCards.size() < 1);
         }
     }
 }
