@@ -1,0 +1,338 @@
+#include <iostream>
+#include <conio.h>
+#include <vector>
+#include <iterator>
+#include <algorithm>
+#include <time.h>
+#include <QCoreApplication>
+
+using namespace std;
+
+struct Card{
+    int rank;
+    int suit;
+    bool isTrump;
+};
+
+struct PlayerHand{
+   vector<Card> pCards;
+};
+
+struct GameTable{       //Игровой стол
+    vector<Card> attack; //Карты в атаке
+    vector<Card> defense; //Карты в защите
+    int pDefender;   //Защищающийся игрок
+};
+
+const int HEART = 1;   //Масти
+const int DIAMOND = 2;
+const int CLUB = 3;
+const int SPADE = 4;
+int PLAYER_NUMBER = 2;
+int TRUMP;
+
+int i;
+int iAtk, iDef;
+int cardID;
+int pAttacker;
+bool check;
+vector <PlayerHand> p(PLAYER_NUMBER);
+GameTable Table;
+
+void giveCards(int &PLAYER_NUMBER, vector<PlayerHand> &p, vector<Card> &AllCards);
+bool isDefCorrect(GameTable &Table, vector<PlayerHand> &p, int &cardID, int &pAttacker);
+void next(GameTable &Table);
+void turn(GameTable &Table, vector<PlayerHand> &p, int &cardID, int &PLAYER_NUMBER, int &iAtk, int &iDef);
+bool isAttCorrect(GameTable &Table, vector<PlayerHand> &p, int &cardID, int &pAttacker);
+void game(GameTable &Table, vector<PlayerHand> &p, vector<Card> &AllCards, int &cardID, int &pAttacker, int &PLAYER_NUMBER);
+bool isGameEnded(vector<PlayerHand> &p, vector<Card> &AllCards);
+void clearTable(GameTable &Table);
+
+int main()
+{
+    srand(static_cast<unsigned int>(time(0)));
+
+    Table.pDefender = 1;
+    iAtk = 0;
+    iDef = 0;
+
+    vector<Card> Deck(36);     //Колода по умолчанию
+
+    for (i = 0; i < 9; i++) {   //Червы
+        Deck[i].rank = i + 6;
+        Deck[i].suit = HEART;
+    }
+
+    for (i = 9; i < 18; i++) {   //Бубны
+        Deck[i].rank = i - 3;
+        Deck[i].suit = DIAMOND;
+    }
+
+    for (i = 18; i < 27; i++) {   //Трефы
+        Deck[i].rank = i - 12;
+        Deck[i].suit = CLUB;
+    }
+
+    for (i = 27; i < 36; i++) {   //Пики
+        Deck[i].rank = i - 21;
+        Deck[i].suit = SPADE;
+    }
+
+    vector<Card> AllCards(Deck);   //Игровая колода
+
+    random_shuffle(AllCards.begin(),AllCards.end());   //Перетасовка колоды  - ПОЧИНЕНО
+
+    TRUMP = AllCards[35].suit;      //Установка козырной масти
+
+    for (i=0; i < 36; i++) {      //Заполнение графы "Козырь" всех карт
+        if (AllCards[i].suit == TRUMP) {
+            AllCards[i].isTrump = true;
+        }
+    }
+
+    giveCards(PLAYER_NUMBER, p, AllCards);
+
+    game(Table, p, AllCards, cardID, pAttacker, PLAYER_NUMBER);
+
+}
+
+void game(GameTable &Table, vector<PlayerHand> &p, vector<Card> &AllCards, int &cardID, int &pAttacker, int &PLAYER_NUMBER) {
+    do {
+        turn(Table, p, cardID, PLAYER_NUMBER, iAtk, iDef);
+        next(Table);
+        giveCards(PLAYER_NUMBER, p, AllCards);
+        clearTable(Table);
+        cout << AllCards.size() << " cards in deck left\n";
+    } while(!isGameEnded(p, AllCards));
+}
+
+void giveCards(int &PLAYER_NUMBER, vector<PlayerHand> &p, vector<Card> &AllCards) {   //Функция раздачи карт
+    for (int i=0; i<PLAYER_NUMBER; i++) {
+        if ( p[i].pCards.size() < 6) {
+            do {
+            p[i].pCards.insert(p[i].pCards.end(), AllCards[0]);
+            AllCards.erase(AllCards.begin());
+            } while (p[i].pCards.size() < 6);
+        }
+    }
+}
+
+bool isDefCorrect(GameTable &Table, vector<PlayerHand> &p, int &cardID, int &pAttacker) {  //Проверка, можно ли побиться
+    if (Table.attack[Table.attack.size()-1].isTrump == true) {
+        if (p[Table.pDefender].pCards[cardID].isTrump == true) {
+            if (p[Table.pDefender].pCards[cardID].rank > Table.attack[Table.attack.size()-1].rank) {
+                return true;
+            }
+            else {cout << "Choose another card!\n";return false;}
+        }
+        else {cout << "Choose another card!\n";return false;}
+    }
+    else if (Table.attack[Table.attack.size()-1].isTrump == false) {
+        if (p[Table.pDefender].pCards[cardID].isTrump == true) {
+            return true;
+        }
+        else if (p[Table.pDefender].pCards[cardID].isTrump == false) {
+            if (p[Table.pDefender].pCards[cardID].suit == Table.attack[Table.attack.size()-1].suit) {
+                if (p[Table.pDefender].pCards[cardID].rank > Table.attack[Table.attack.size()-1].rank) {
+                    return true;
+                }
+                else {cout << "Choose another card!\n";return false;}
+            }
+            else {cout << "Choose another card!\n";return false;}
+        }
+    }
+}
+
+bool isAttCorrect(GameTable &Table, vector<PlayerHand> &p, int &cardID, int &pAttacker) {
+    for (int i = 0; i < (Table.attack.size() + 1); i++) {  //Без +1 начинает терять последнюю карту. Предположительно. Возможны баги
+        if (Table.attack[i].rank == p[pAttacker].pCards[cardID].rank) {
+            return true;
+        }
+        else if (Table.defense[i].rank == p[pAttacker].pCards[cardID].rank) {
+            return true;
+        }
+        else {cout << "Choose another card!\n";return false;};
+    }
+}
+
+void next(GameTable &Table) { //Переход бьющегося игрока
+    if (Table.pDefender >= PLAYER_NUMBER-1) {
+    Table.pDefender = 0;
+    }
+    else {Table.pDefender += 1;}
+}
+
+void turn(GameTable &Table,vector<PlayerHand> &p, int &cardID, int &PLAYER_NUMBER, int &iAtk, int &iDef) {
+    pAttacker = Table.pDefender - 1;
+    if (pAttacker < 0) pAttacker = PLAYER_NUMBER - 1;
+
+    bool grabbed;
+
+    cout << pAttacker+1 <<" player turn\n";
+    cout << "Enter card number to go: \n";
+    for (i = 0; i < p[pAttacker].pCards.size(); i++) {
+        cout << i << " = " << p[pAttacker].pCards[i].rank << "-" << p[pAttacker].pCards[i].suit << "-" << p[pAttacker].pCards[i].isTrump << "  ";
+    }
+    cout << "\n";
+    cin >> cardID;
+    cout << "Chosen card is " << p[pAttacker].pCards[cardID].rank << "-" << p[pAttacker].pCards[cardID].suit << "-" << p[pAttacker].pCards[cardID].isTrump << "\n";
+
+    Table.attack.insert(Table.attack.end(), p[pAttacker].pCards[cardID]);
+    p[pAttacker].pCards.erase(p[pAttacker].pCards.begin() + cardID);
+    vector<Card>(p[pAttacker].pCards).swap(p[pAttacker].pCards);
+    iAtk +=1;
+
+    cout << "Now your cards is: \n";
+    for (i = 0; i < p[pAttacker].pCards.size(); i++) {
+        cout << i << " = " << p[pAttacker].pCards[i].rank << "-" << p[pAttacker].pCards[i].suit << "-" << p[pAttacker].pCards[i].isTrump << "  ";
+    }
+    cout << "\n\n";
+    cout << Table.pDefender+1 << " player turn\n";  //Ход второго игрока
+    cout << "You attacked with " << Table.attack[Table.attack.size()-1].rank << "-" << Table.attack[Table.attack.size()-1].suit << "-" << Table.attack[Table.attack.size()-1].isTrump << "\n";;
+    cout << "Enter card number to defend or '-1' to grab: \n";
+
+    do {
+        for (i = 0; i < p[Table.pDefender].pCards.size(); i++) {
+            cout << i << " = " << p[Table.pDefender].pCards[i].rank << "-" << p[Table.pDefender].pCards[i].suit << "-" << p[Table.pDefender].pCards[i].isTrump << "  ";
+        }
+        cout << "\n";
+        cin >> cardID;
+        if (cardID == -1) {  //TODO - Дописать цикл забора всех карт со стола
+            p[Table.pDefender].pCards.insert(p[Table.pDefender].pCards.end(), Table.attack[0]);
+            Table.attack.erase(Table.attack.begin());
+            vector<Card>(Table.attack).swap(Table.attack);
+            iAtk = 0;
+            cout << "Now your cards is: \n";
+            for (i = 0; i < p[Table.pDefender].pCards.size(); i++) {
+                cout << i << " = " << p[Table.pDefender].pCards[i].rank << "-" << p[Table.pDefender].pCards[i].suit << "-" << p[Table.pDefender].pCards[i].isTrump << "  ";
+            }
+            next(Table);
+            grabbed = true;
+            break;
+        }
+        } while (!isDefCorrect(Table, p, cardID, pAttacker));
+
+    if (!grabbed) {
+        cout << "Chosen card is " << p[Table.pDefender].pCards[cardID].rank << "-" << p[Table.pDefender].pCards[cardID].suit << "-" << p[Table.pDefender].pCards[cardID].isTrump << "\n";
+        Table.defense.insert(Table.defense.end(), p[Table.pDefender].pCards[cardID]);
+        p[Table.pDefender].pCards.erase(p[Table.pDefender].pCards.begin() + cardID);
+        vector<Card>(p[Table.pDefender].pCards).swap(p[Table.pDefender].pCards);
+        iDef +=1;
+    cout << "Now your cards is: \n";
+    for (i = 0; i < p[Table.pDefender].pCards.size(); i++) {
+        cout << i << " = " << p[Table.pDefender].pCards[i].rank << "-" << p[Table.pDefender].pCards[i].suit << "-" << p[Table.pDefender].pCards[i].isTrump << "  ";
+    }
+    }
+
+    if (!grabbed) {
+    do {
+            cout << "\n";
+            cout << pAttacker+1 <<" player turn\n";
+            cout << "Enter card number to go or -1 to skip: \n";
+
+            do {
+                for (i = 0; i < p[pAttacker].pCards.size(); i++) {
+                cout << i << " = " << p[pAttacker].pCards[i].rank << "-" << p[pAttacker].pCards[i].suit << "-" << p[pAttacker].pCards[i].isTrump << "  ";
+                }
+                cout << "\n";
+                cin >> cardID;
+                if (cardID == -1) {    //Бита
+                    for (int i = 0; i < iAtk; i++) {  //Очистка стола для следующего хода
+                        Table.attack.erase(Table.attack.begin());
+                        vector<Card>(Table.attack).swap(Table.attack);
+                    }
+                    for (int i = 0; i < iDef; i++) {
+                        Table.defense.erase(Table.defense.begin());
+                        vector<Card>(Table.defense).swap(Table.defense);
+                    }
+                    return;
+                }
+            } while (!isAttCorrect(Table, p, cardID, pAttacker));
+
+            cout << "Chosen card is " << p[pAttacker].pCards[cardID].rank << "-" << p[pAttacker].pCards[cardID].suit << "-" << p[pAttacker].pCards[cardID].isTrump << "\n";
+            Table.attack.insert(Table.attack.end(), p[pAttacker].pCards[cardID]);
+            p[pAttacker].pCards.erase(p[pAttacker].pCards.begin() + cardID);
+            vector<Card>(p[pAttacker].pCards).swap(p[pAttacker].pCards);
+            iAtk +=1;
+
+            cout << "Now your cards is: \n";
+            for (i = 0; i < p[pAttacker].pCards.size(); i++) {
+                cout << i << " = " << p[pAttacker].pCards[i].rank << "-" << p[pAttacker].pCards[i].suit << "-" << p[pAttacker].pCards[i].isTrump << "  ";
+            }
+            cout << "\n\n";
+            cout << Table.pDefender+1 << " player turn\n";  //Ход второго игрока
+            cout << "You attacked with " << Table.attack[Table.attack.size()-1].rank << "-" << Table.attack[Table.attack.size()-1].suit << "-" << Table.attack[Table.attack.size()-1].isTrump << "\n";;
+            cout << "Enter card number to defend or '-1' to grab: \n";
+
+            do {
+                for (i = 0; i < p[Table.pDefender].pCards.size(); i++) {
+                    cout << i << " = " << p[Table.pDefender].pCards[i].rank << "-" << p[Table.pDefender].pCards[i].suit << "-" << p[Table.pDefender].pCards[i].isTrump << "  ";
+                }
+                cout << "\n";
+                cin >> cardID;
+                if (cardID == -1) {
+                    for (int i = 0; i < iAtk; i++) {
+                        p[Table.pDefender].pCards.insert(p[Table.pDefender].pCards.end(), Table.attack[0]);
+                        Table.attack.erase(Table.attack.begin());
+                        vector<Card>(Table.attack).swap(Table.attack);
+                    }
+                    for (int i = 0; i < iDef; i++) {
+                        p[Table.pDefender].pCards.insert(p[Table.pDefender].pCards.end(), Table.defense[0]);
+                        Table.defense.erase(Table.defense.begin());
+                        vector<Card>(Table.defense).swap(Table.defense);
+                    }
+                    iAtk = 0;
+                    iDef = 0;
+                    cout << "Now your cards is: \n";
+                    for (i = 0; i < p[Table.pDefender].pCards.size(); i++) {
+                        cout << i << " = " << p[Table.pDefender].pCards[i].rank << "-" << p[Table.pDefender].pCards[i].suit << "-" << p[Table.pDefender].pCards[i].isTrump << "  ";
+                    }
+                    cout << "\n";
+                    next(Table);
+                    grabbed = true;
+                    return;
+                }
+            } while (!isDefCorrect(Table, p, cardID, pAttacker));
+
+            cout << "Chosen card is " << p[Table.pDefender].pCards[cardID].rank << "-" << p[Table.pDefender].pCards[cardID].suit << "-" << p[Table.pDefender].pCards[cardID].isTrump << "\n";
+            Table.defense.insert(Table.defense.end(), p[Table.pDefender].pCards[cardID]);
+            p[Table.pDefender].pCards.erase(p[Table.pDefender].pCards.begin() + cardID);
+            vector<Card>(p[Table.pDefender].pCards).swap(p[Table.pDefender].pCards);
+            iDef +=1;
+            cout << "Now your cards is: \n";
+            for (i = 0; i < p[Table.pDefender].pCards.size(); i++) {
+                cout << i << " = " << p[Table.pDefender].pCards[i].rank << "-" << p[Table.pDefender].pCards[i].suit << "-" << p[Table.pDefender].pCards[i].isTrump << "  ";
+            }
+    } while(p[Table.pDefender].pCards.size() > 0);
+    }
+}
+
+bool isGameEnded(vector<PlayerHand> &p, vector<Card> &AllCards) {
+    if (AllCards.size() < 1) {
+        if (p[0].pCards.size() < 1 && p[1].pCards.size() > 0) {
+            cout << "First player won!!!";
+            return true;
+        }
+        else if (p[1].pCards.size() < 1 && p[0].pCards.size() > 0) {
+            cout << "Second player won!!!";
+            return true;
+        }
+        else if (p[1].pCards.size() < 1 && p[0].pCards.size() < 1) {
+            cout << "Draft!";
+            return true;
+        }
+        else {return false;};
+    }
+    return false;
+}
+
+void clearTable(GameTable &Table) {
+    for (int i = 0; i < (Table.attack.size()); i++) {
+        Table.attack.erase(Table.attack.begin());
+        vector<Card>(Table.attack).swap(Table.attack);
+    }
+    for (int i = 0; i < (Table.defense.size()); i++) {
+        Table.defense.erase(Table.defense.begin());
+        vector<Card>(Table.defense).swap(Table.defense);
+    }
+}
